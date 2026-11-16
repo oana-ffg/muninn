@@ -311,3 +311,35 @@ test("late duplicate upload cannot recreate bytes after acknowledgement", async 
     0,
   );
 });
+
+test("delivered status independently verifies R2 deletion", async () => {
+  const id = await create(),
+    a = await upload(id);
+  assert.equal(
+    (await req(`/api/sessions/${id}/done`, "POST", owner)).status,
+    200,
+  );
+  assert.equal(
+    (
+      await req(
+        `/api/sessions/${id}/ack`,
+        "POST",
+        delivery,
+        JSON.stringify({ photos: [{ id: a.photo, sha256: sha(bytes) }] }),
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await (await req(`/api/sessions/${id}`, "GET", delivery)).json())
+      .remote_deleted,
+    true,
+  );
+  await bucket.put(`sessions/${id}/unexpected.jpg`, bytes);
+  assert.equal(
+    (await (await req(`/api/sessions/${id}`, "GET", delivery)).json())
+      .remote_deleted,
+    false,
+  );
+  await bucket.delete(`sessions/${id}/unexpected.jpg`);
+});

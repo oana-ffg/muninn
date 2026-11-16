@@ -279,6 +279,13 @@ async function route(request: Request, env: Env): Promise<Response> {
         thread: s.thread,
         label: s.label,
         state: s.state,
+        ...(isMachine && s.state === "delivered"
+          ? {
+              remote_deleted:
+                (await env.BUCKET.list({ prefix: `sessions/${id}/`, limit: 1 }))
+                  .objects.length === 0,
+            }
+          : {}),
         expires_at: s.expires_at,
         photos: (await list(env, id))
           .filter((p) => p.ready === 1)
