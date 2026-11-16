@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import uuid
 
 spec=importlib.util.spec_from_file_location('muninn',Path(__file__).parents[1]/'scripts/muninn.py')
@@ -50,6 +51,24 @@ class ClientTests(unittest.TestCase):
         self.assertNotEqual(token,self.client.delivery_token(self.session))
         self.client.thread='chat-a';self.client.environment='host-b'
         self.assertNotEqual(token,self.client.delivery_token(self.session))
+    def test_maintenance_paginates_and_prunes(self):
+        pages=iter([{'purged_sessions':25,'more':True},{'purged_sessions':2,'more':False}])
+        self.client.request=lambda *args,**kwargs:next(pages)
+        result=mod.maintain(self.client,{},self.temp.name,7)
+        self.assertEqual(result['purged_sessions'],27)
+    def test_maintenance_alerts_once_and_preserves_failure(self):
+        def fail(*args,**kwargs):raise mod.ClientError('Synthetic failure')
+        self.client.request=fail
+        with patch.object(mod.subprocess,'run') as notify:
+            notify.return_value.returncode=0
+            with self.assertRaisesRegex(mod.ClientError,'Synthetic failure'):
+                mod.maintain(self.client,{'alert_command':['notify']},self.temp.name,7)
+            notify.assert_called_once()
+    def test_acknowledgement_recovery_uses_local_verified_bytes(self):
+        self.client.fetch(self.session,self.temp.name)
+        self.calls=[];self.state['state']='acknowledging'
+        self.client.fetch(self.session,self.temp.name)
+        self.assertFalse(any('/photos/' in path for _,path in self.calls))
     def test_no_redirect(self):
         with self.assertRaises(mod.ClientError):mod.NoRedirect().redirect_request(None,None,302,'',{},'https://elsewhere.example.test')
     def test_cache_symlink_refused(self):

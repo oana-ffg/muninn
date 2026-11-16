@@ -202,6 +202,27 @@ def prune(cache, days):
         removed+=1
     return {'removed_sessions':removed}
 
+def maintain(client, config, cache, days):
+    try:
+        purged = 0
+        for _ in range(100):
+            result = client.request('POST', '/api/cleanup', {})
+            purged += result['purged_sessions']
+            if not result['more']:
+                break
+        else:
+            raise ClientError('Remote cleanup exceeded its batch limit; retention is incomplete.')
+        return {'purged_sessions': purged, **prune(cache, days)}
+    except Exception:
+        command = config.get('alert_command')
+        if not isinstance(command, list) or not command:
+            raise ClientError('Retention failed and no alert_command is configured. Inspect the scheduler run.') from None
+        message = 'Muninn retention cleanup failed on ' + config.get('maintenance_label', 'this host') + '. Inspect its scheduler run; cleanup is incomplete.'
+        result = subprocess.run([*command, message], capture_output=True, timeout=45, check=False)
+        if result.returncode:
+            raise ClientError('Retention failed and its failure notification also failed. Inspect scheduler logs.') from None
+        raise
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config',default=str(Path.home()/'.config/muninn/client.json'))
@@ -213,6 +234,7 @@ def main():
         p=sub.add_parser(command);p.add_argument('session')
         if command=='wait':p.add_argument('--timeout',type=int,default=1800)
     sub.add_parser('cleanup')
+    maintenance=sub.add_parser('maintain');maintenance.add_argument('--days',type=int,default=7)
     prune_parser=sub.add_parser('prune');prune_parser.add_argument('--days',type=int,default=7)
     args=parser.parse_args()
     config,bundle=credential_bundle(args.config)
@@ -236,6 +258,9 @@ def main():
             if time.monotonic()>=deadline:
                 raise ClientError('Timed out waiting for Done. Fetch the same session to resume.')
             time.sleep(min(2,max(0,deadline-time.monotonic())))
+    elif args.command=='maintain':
+        if args.days<1:raise ClientError('Retention must be at least one day.')
+        result=maintain(client,config,cache,args.days)
     elif args.command=='cleanup':
         result=client.request('POST','/api/cleanup',{})
     else:

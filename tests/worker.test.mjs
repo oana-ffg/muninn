@@ -245,3 +245,69 @@ test("concurrent uploads respect photo cap, Done excludes pending reservations",
     409,
   );
 });
+
+test("late duplicate upload cannot recreate bytes after acknowledgement", async () => {
+  const { default: worker } = await import("../dist/server/index.js");
+  const id = await create(),
+    photo = randomUUID();
+  let release, started;
+  const entered = new Promise((resolve) => {
+    started = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const delayedBucket = new Proxy(bucket, {
+    get(target, property) {
+      if (property === "put")
+        return async (...args) => {
+          started();
+          await gate;
+          return target.put(...args);
+        };
+      const value = target[property];
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const pending = worker.fetch(
+    new Request(origin + `/api/sessions/${id}/photos/${photo}`, {
+      method: "PUT",
+      headers: {
+        ...owner,
+        "Content-Type": "image/jpeg",
+        "X-Content-SHA256": sha(bytes),
+      },
+      body: bytes,
+    }),
+    {
+      DB: db,
+      BUCKET: delayedBucket,
+      OWNER_EMAIL: "owner@example.test",
+      APP_ORIGIN: origin,
+      MACHINE_TOKEN_SHA256: sha(appToken),
+    },
+  );
+  await entered;
+  assert.equal((await upload(id, photo)).r.status, 200);
+  assert.equal(
+    (await req(`/api/sessions/${id}/done`, "POST", owner)).status,
+    200,
+  );
+  assert.equal(
+    (
+      await req(
+        `/api/sessions/${id}/ack`,
+        "POST",
+        delivery,
+        JSON.stringify({ photos: [{ id: photo, sha256: sha(bytes) }] }),
+      )
+    ).status,
+    200,
+  );
+  release();
+  assert.equal((await pending).status, 200);
+  assert.equal(
+    (await bucket.list({ prefix: `sessions/${id}/` })).objects.length,
+    0,
+  );
+});

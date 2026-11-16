@@ -47,10 +47,13 @@ Every installation must use separate Site identity, database, storage, and crede
    returned session ID and the same environment/thread. `fetch` performs one nonblocking
    check and resumes interrupted downloads. All operations reject cross-thread binding.
    Inspect every returned local image with your agent's image viewer.
-10. Arrange daily `cleanup` to remove remote sessions after 24 hours, and `prune` to
+10. Arrange daily `maintain` (or separate `cleanup` and `prune` jobs) to remove remote sessions after 24 hours, and `prune` to
     remove local completed cache directories after seven days. Use the host's normal
     script scheduler. Session creation also runs bounded remote cleanup opportunistically.
-    Repeat cleanup while its response says `more`. Failed cleanup must be surfaced.
+    Repeat standalone cleanup while its response says `more`. `maintain` handles pagination
+    and invokes the configured `alert_command` argument array once on failure, appending a
+    concise notification message. Configure that command and optional `maintenance_label`
+    in the private client configuration. Failed cleanup must be surfaced.
 
 Capture accepts photos for 30 minutes. Done sessions remain retrievable until 24 hours
 after creation; acknowledgement immediately deletes R2 bytes while metadata remains until
