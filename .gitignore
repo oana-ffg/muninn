@@ -1,0 +1,11 @@
+.openai/hosting.json
+.sites-checkout
+.local/
+dist/
+node_modules/
+.wrangler/
+.env*
+.dev.vars*
+__pycache__/
+*.py[cod]
+test-results/

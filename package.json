@@ -1,0 +1,37 @@
+{
+  "name": "muninn-photo-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+    "test": "npm run build && node --test tests/*.test.mjs && python3 -m unittest discover -s tests -p 'test_*.py' -v",
+    "db:generate": "drizzle-kit generate",
+    "site:sync-source": "node scripts/site_source_sync.mjs",
+    "check": "npm run typecheck && npm run format:check && npm test",
+    "format:check": "prettier --check web worker db scripts/*.mjs tests/*.mjs *.ts *.json *.md examples/pic/SKILL.md"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "@playwright/test": "^1.63.0",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "esbuild": "^0.28.2",
+    "miniflare": "^4.20260730.0",
+    "prettier": "^3.10.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.0"
+    },
+    "miniflare": {
+      "sharp": "^0.35.5",
+      "undici": "^7.30.1"
+    }
+  }
+}
