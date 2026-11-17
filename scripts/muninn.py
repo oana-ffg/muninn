@@ -362,35 +362,6 @@ def maintain(client, cache, days):
     return {"purged_sessions": purged, **prune(cache, days)}
 
 
-def notify_retention_failure(config):
-    command = config.get("alert_command")
-    if (
-        not isinstance(command, list)
-        or not command
-        or not all(isinstance(p, str) and p for p in command)
-    ):
-        raise ClientError(
-            "Retention failed and no valid alert_command is configured. Inspect the scheduler run."
-        )
-    message = (
-        "Muninn retention cleanup failed on "
-        + config.get("maintenance_label", "this host")
-        + ". Inspect its scheduler run; cleanup is incomplete."
-    )
-    try:
-        result = subprocess.run(
-            [*command, message], capture_output=True, timeout=45, check=False
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        raise ClientError(
-            "Retention failed and its failure notification could not run. Inspect scheduler logs."
-        ) from None
-    if result.returncode:
-        raise ClientError(
-            "Retention failed and its failure notification also failed. Inspect scheduler logs."
-        )
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -413,12 +384,7 @@ def main():
     prune_parser.add_argument("--days", type=int, default=7)
     args = parser.parse_args()
     config = load_config(args.config)
-    try:
-        run(args, config)
-    except Exception:
-        if args.command == "maintain":
-            notify_retention_failure(config)
-        raise
+    run(args, config)  # Failures propagate to Vardr and its T3 investigator.
 
 
 def run(args, config):

@@ -51,9 +51,11 @@ Every installation must use separate Site identity, database, storage, and crede
     remove local completed cache directories after seven days. Use the host's normal
     script scheduler. Session creation also runs bounded remote cleanup opportunistically.
     Repeat standalone cleanup while its response says `more`. `maintain` handles pagination
-    and invokes the configured `alert_command` argument array once on failure, appending a
-    concise notification message. Configure that command and optional `maintenance_label`
-    in the private client configuration. Failed cleanup must be surfaced.
+    and exits non-zero on failure. On Brunnr and Skirnir, Vardr routes failures to a
+    signed T3 webhook investigation. Routine retention failures no longer invoke
+    `alert_command`; the legacy private configuration may retain that unused setting.
+    Investigation runs leave unresolved work open and follow the global urgency rule
+    before sending a phone alert.
 
 Capture accepts photos for 30 minutes. Done sessions remain retrievable until 24 hours
 after creation; acknowledgement immediately deletes R2 bytes while metadata remains until

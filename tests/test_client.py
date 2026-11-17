@@ -100,7 +100,7 @@ class ClientTests(unittest.TestCase):
         result = mod.maintain(self.client, self.temp.name, 7)
         self.assertEqual(result["purged_sessions"], 27)
 
-    def test_maintenance_credential_failure_alerts_once(self):
+    def test_maintenance_credential_failure_propagates_without_phone(self):
         with (
             patch.object(
                 mod, "load_config", return_value={"alert_command": ["notify"]}
@@ -120,9 +120,9 @@ class ClientTests(unittest.TestCase):
                 mod.ClientError, "Synthetic credential failure"
             ):
                 mod.main()
-            notify.assert_called_once()
+            notify.assert_not_called()
 
-    def test_maintenance_storage_failure_alerts_once(self):
+    def test_maintenance_storage_failure_propagates_without_phone(self):
         with (
             patch.object(
                 mod, "load_config", return_value={"alert_command": ["notify"]}
@@ -138,7 +138,7 @@ class ClientTests(unittest.TestCase):
             notify.return_value.returncode = 0
             with self.assertRaisesRegex(mod.ClientError, "Synthetic storage failure"):
                 mod.main()
-            notify.assert_called_once()
+            notify.assert_not_called()
 
     def test_acknowledgement_recovery_uses_local_verified_bytes(self):
         self.client.fetch(self.session, self.temp.name)
