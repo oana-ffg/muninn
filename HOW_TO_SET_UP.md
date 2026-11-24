@@ -41,6 +41,9 @@ Every installation must use separate Site identity, database, storage, and crede
    The provider prints a JSON object with `origin`, `gateway_token`, and `app_token` to
    its stdout. The client captures that output in memory. No particular secret manager is
    required. Credentials must never be passed in process arguments or stored in plaintext.
+   On Windows, `scripts/muninn_wincred.py` provides a standard-library Windows Credential
+   Manager backend (`set` reads the JSON bundle from stdin; `get` prints it to stdout for
+   `credential_command`; `check` verifies configuration without printing secrets).
 
 9. Create a session using `python3 scripts/muninn.py --thread "$T3CODE_THREAD_ID" new
 --label "Photo capture"`. Share the returned URL in that chat. Run `wait` with the
