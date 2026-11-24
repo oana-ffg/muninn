@@ -108,6 +108,14 @@ class WinCredProviderTests(unittest.TestCase):
         with self.assertRaises(mod.ProviderError):
             self._run(["set"], json.dumps(oversized).encode("utf-8"))
 
+    def test_accepts_utf8_bom_on_set_and_strips_on_get(self):
+        bom_input = b"\xef\xbb\xbf" + json.dumps(self.sample).encode("utf-8")
+        stored = json.loads(self._run(["set"], bom_input))
+        self.assertEqual(stored["status"], "stored")
+        raw = self._run(["get"])
+        self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
+        self.assertEqual(json.loads(raw), self.sample)
+
     def test_error_messages_distinguish_not_found_and_logon_session(self):
         self.assertIn(
             "was not found",

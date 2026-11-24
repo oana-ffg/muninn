@@ -42,8 +42,9 @@ Every installation must use separate Site identity, database, storage, and crede
    its stdout. The client captures that output in memory. No particular secret manager is
    required. Credentials must never be passed in process arguments or stored in plaintext.
    On Windows, `scripts/muninn_wincred.py` provides a standard-library Windows Credential
-   Manager backend (`set` reads the JSON bundle from stdin; `get` prints it to stdout for
-   `credential_command`; `check` verifies configuration without printing secrets).
+   Manager backend: pipe or paste the JSON bundle into `python scripts/muninn_wincred.py set`
+   (finish interactive paste with Ctrl+Z then Enter), verify with `check` (prints no secrets),
+   and configure `credential_command` as `["<path-to-python.exe>", "<path-to-muninn_wincred.py>", "get"]`.
 
 9. Create a session using `python3 scripts/muninn.py --thread "$T3CODE_THREAD_ID" new
 --label "Photo capture"`. Share the returned URL in that chat. Run `wait` with the

@@ -48,7 +48,7 @@ def validate_bundle(raw_bytes):
     if len(raw_bytes) > MAX_INPUT_BYTES:
         raise ProviderError("Credential bundle exceeds the allowed size.")
     try:
-        bundle = json.loads(raw_bytes.decode("utf-8"))
+        bundle = json.loads(raw_bytes.decode("utf-8-sig"))
     except (ValueError, UnicodeError):
         raise ProviderError("Credential bundle must be valid UTF-8 JSON.") from None
     if not isinstance(bundle, dict) or any(
@@ -65,10 +65,7 @@ def validate_bundle(raw_bytes):
 
 
 def encode_utf16le(payload_utf8):
-    try:
-        blob = payload_utf8.decode("utf-8").encode("utf-16-le")
-    except UnicodeError:
-        raise ProviderError("Credential bundle must be valid UTF-8.") from None
+    blob = payload_utf8.decode("utf-8").encode("utf-16-le")
     if not blob or len(blob) > CRED_MAX_CREDENTIAL_BLOB_SIZE:
         raise ProviderError(
             "Credential bundle exceeds the Windows Credential Manager size limit."
@@ -156,7 +153,7 @@ class WinCredBackend:
         try:
             cred = cred_ptr.contents
             size = int(cred.CredentialBlobSize)
-            if size <= 0 or size > CRED_MAX_CREDENTIAL_BLOB_SIZE or size % 2:
+            if size <= 0 or size > CRED_MAX_CREDENTIAL_BLOB_SIZE:
                 raise ProviderError(
                     "Stored Windows credential blob has an invalid size."
                 )
@@ -168,6 +165,7 @@ class WinCredBackend:
                 return decode_utf16le(buf.raw)
             finally:
                 ctypes.memset(buf, 0, size)
+                ctypes.memset(cred.CredentialBlob, 0, size)
         finally:
             self._advapi32.CredFree(cred_ptr)
 
@@ -220,8 +218,6 @@ def run(args, backend=None, stdin_stream=None, stdout_stream=None):
         if not args.username or "\x00" in args.username:
             raise ProviderError("Credential username must be a non-empty string.")
         raw = inp.read(MAX_INPUT_BYTES + 1)
-        if len(raw) > MAX_INPUT_BYTES:
-            raise ProviderError("Credential input exceeded the allowed size.")
         normalized, origin = validate_bundle(raw)
         store.write(args.target, args.username, normalized)
         out.write(
@@ -231,8 +227,6 @@ def run(args, backend=None, stdin_stream=None, stdout_stream=None):
             + b"\n"
         )
         out.flush()
-    else:
-        raise ProviderError(f"Unknown command: {args.command}")
 
 
 def build_parser():
