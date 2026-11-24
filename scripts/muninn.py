@@ -57,7 +57,7 @@ def load_config(config_path):
         or (os.name != "nt" and path.stat().st_mode & 0o077)
     ):
         raise ClientError("Configuration must be an owner-private regular file.")
-    config = json.loads(path.read_text())
+    config = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise ClientError("Configuration must be a JSON object.")
     return config
@@ -71,6 +71,9 @@ def credential_bundle(config):
         or not all(isinstance(p, str) and p and "\x00" not in p for p in command)
     ):
         raise ClientError("Configure credential_command as a nonempty argument array.")
+    run_kwargs = {}
+    if os.name == "nt":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
         result = subprocess.run(
             command,
@@ -78,6 +81,7 @@ def credential_bundle(config):
             capture_output=True,
             timeout=30,
             check=False,
+            **run_kwargs,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ClientError(
@@ -330,7 +334,7 @@ def prune(cache, days):
             or manifest.stat().st_mtime >= cutoff
         ):
             continue
-        record = json.loads(manifest.read_text())
+        record = json.loads(manifest.read_text(encoding="utf-8"))
         names = {p["id"] + ".jpg" for p in record["photos"]}
         if record.get("id") != child.name or any(
             not UUID.fullmatch(p.get("id", "")) for p in record["photos"]

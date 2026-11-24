@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import json
 import tempfile
 import unittest
 import uuid
@@ -163,6 +164,35 @@ class ClientTests(unittest.TestCase):
         (Path(self.temp.name) / ".git").mkdir()
         with self.assertRaises(mod.ClientError):
             mod.private_directory(Path(self.temp.name) / "photos")
+
+    def test_windows_credential_command_uses_no_window_flag(self):
+        completed = type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps(
+                    {
+                        "origin": "https://muninn.example.test",
+                        "gateway_token": "gw",
+                        "app_token": "app",
+                    }
+                ).encode("utf-8"),
+            },
+        )()
+        with (
+            patch.object(mod.os, "name", "nt"),
+            patch.object(mod.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True),
+            patch.object(mod.subprocess, "run", return_value=completed) as run,
+        ):
+            bundle = mod.credential_bundle(
+                {
+                    "origin": "https://muninn.example.test",
+                    "credential_command": ["python.exe", "muninn_wincred.py", "get"],
+                }
+            )
+            self.assertEqual(bundle["origin"], "https://muninn.example.test")
+            self.assertEqual(run.call_args.kwargs["creationflags"], 0x08000000)
 
 
 if __name__ == "__main__":
